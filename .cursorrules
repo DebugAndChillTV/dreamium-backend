@@ -1,0 +1,229 @@
+# Dreamium Backend - Cursor Rules
+
+## Project Overview
+This is a Go backend API for Dreamium, an iOS dream interpretation app. The backend:
+- Processes user dream descriptions via OpenAI
+- Provides psychological, symbolic, and custom psychologist interpretations
+- Uses Supabase for authentication and data storage
+- Deployed on Railway
+- Built with Fiber web framework
+
+## Core Architecture
+
+### Tech Stack
+- **Language**: Go 1.23+
+- **Framework**: Fiber v2 (Express-like framework for Go)
+- **AI/ML**: OpenAI API (GPT-3.5 Turbo, GPT-4 Turbo)
+- **Database**: Supabase (PostgreSQL with real-time features)
+- **Authentication**: Supabase Auth (JWT-based)
+- **Deployment**: Railway
+- **Rate Limiting**: In-memory cache with go-cache
+
+### Project Structure
+```
+dreamium-backend/
+├── main.go              # Application entry point
+├── middleware/          # Custom middleware
+│   ├── auth.go         # Supabase JWT authentication
+│   └── rate-limit.go   # Rate limiting (10 req/min per IP)
+└── routes/             # API route handlers
+    ├── openai.go       # OpenAI integration & dream analysis
+    └── routes.go       # Route configuration
+```
+
+## Code Style & Standards
+
+### Go Conventions
+- Follow standard Go formatting (use `gofmt`)
+- Use camelCase for JSON fields, PascalCase for struct fields
+- Prefer explicit error handling over panic
+- Use meaningful variable names
+- Package names should be lowercase, single words
+
+### API Design
+- RESTful endpoints under `/api` prefix
+- All endpoints require Supabase authentication
+- Use HTTP status codes correctly:
+  - 200: Success
+  - 400: Bad Request (invalid input)
+  - 401: Unauthorized (missing/invalid auth)
+  - 429: Too Many Requests
+  - 500: Internal Server Error
+
+### Error Handling
+- Always return structured JSON errors: `{"error": "message"}`
+- Log errors appropriately but don't expose sensitive info
+- Handle OpenAI API failures gracefully
+- Validate all incoming request bodies
+
+## Environment Variables
+Required environment variables:
+```
+PORT=8080                    # Server port (Railway sets this)
+OPENAI_API_KEY=sk-...       # OpenAI API key
+SUPABASE_URL=https://...    # Supabase project URL
+SUPABASE_ANON_KEY=eyJ...    # Supabase anonymous key
+```
+
+## API Endpoints
+
+### Authentication
+All `/api/*` routes require `Authorization: Bearer <supabase_jwt>` header.
+
+### Core Endpoints
+1. `POST /api/isDreamInput` - Validates dream input and detects language
+2. `POST /api/generateDreamAnalysis` - General psychological analysis
+3. `POST /api/generateSymbolicInterpretation` - Symbolic/folklore interpretation
+4. `POST /api/generatePsychologistInterpretation` - Specific psychologist perspective
+
+### Request/Response Patterns
+- Accept JSON request bodies
+- Return JSON responses
+- Include `userId` in requests for user-specific features
+- Support multilingual responses via `detectedLanguage` field
+
+## OpenAI Integration Guidelines
+
+### Model Selection
+- Use `GPT-3.5 Turbo` for simple validation tasks
+- Use `GPT-4 Turbo` for complex dream analysis
+- Keep token limits reasonable (30-500 tokens)
+
+### Prompt Engineering
+- Use system messages to define AI role and constraints
+- Keep responses concise (5-7 sentences max)
+- Support multiple languages based on detected input language
+- Reference specific psychological theories when relevant (Freud, Jung, etc.)
+
+### Error Handling
+- Handle OpenAI rate limits and API errors
+- Provide meaningful error messages to clients
+- Don't expose raw OpenAI errors to users
+
+## Database (Supabase) Guidelines
+
+### Authentication
+- Verify JWT tokens using Supabase client
+- Extract user ID from verified tokens
+- Store user ID in Fiber locals for route access
+- Handle token expiration gracefully
+
+### Best Practices
+- Use Supabase client for all database operations
+- Implement proper connection pooling
+- Use environment variables for credentials
+- Follow Supabase Row Level Security (RLS) patterns
+
+## Middleware Guidelines
+
+### Rate Limiting
+- Current limit: 10 requests per minute per IP
+- Uses in-memory cache (consider Redis for production scaling)
+- Apply globally before authentication
+
+### Authentication
+- Validate Bearer token format
+- Verify token with Supabase
+- Attach user ID to request context
+- Return clear error messages
+
+## Deployment (Railway)
+
+### Configuration
+- Railway automatically sets `PORT` environment variable
+- Use Railway environment variables for secrets
+- Ensure proper health check endpoints if needed
+
+### Monitoring
+- Log important events (startup, errors)
+- Monitor OpenAI API usage and costs
+- Track authentication failures
+
+## Security Considerations
+
+### API Security
+- Never expose sensitive environment variables
+- Validate all user inputs
+- Use HTTPS in production (Railway handles this)
+- Implement proper CORS if needed
+
+### OpenAI Security
+- Don't log user dream content unnecessarily
+- Implement usage limits per user if needed
+- Monitor for prompt injection attempts
+
+## Testing Guidelines
+
+### Unit Tests
+- Test middleware functions independently
+- Mock OpenAI API calls in tests
+- Test error handling paths
+- Validate JSON request/response structures
+
+### Integration Tests
+- Test complete request flows
+- Test authentication edge cases
+- Test rate limiting behavior
+
+## Performance Considerations
+
+### Optimization
+- Use connection pooling for database
+- Implement caching for repeated analyses
+- Monitor OpenAI API response times
+- Consider implementing request queuing for high loads
+
+### Scaling
+- Current in-memory rate limiter won't scale across instances
+- Consider Redis for distributed caching
+- Monitor memory usage of dream analysis requests
+
+## Common Patterns
+
+### Adding New Endpoints
+1. Define request/response structs
+2. Implement handler function in routes/
+3. Add route to SetupRoutes()
+4. Test authentication and rate limiting
+5. Handle all error cases
+
+### OpenAI Integration
+1. Define clear system prompts
+2. Set appropriate token limits
+3. Handle API errors gracefully
+4. Return structured responses
+
+### Error Response Format
+```go
+return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+    "error": "Clear, user-friendly error message"
+})
+```
+
+## Development Workflow
+
+### Local Development
+1. Copy environment variables to `.env`
+2. Run `go mod tidy` for dependencies
+3. Use `go run main.go` for development
+4. Test endpoints with proper Supabase JWT tokens
+
+### Code Quality
+- Run `go fmt` before committing
+- Use `go vet` to catch common errors
+- Consider using golangci-lint for comprehensive linting
+- Keep functions focused and testable
+
+## iOS App Integration Notes
+
+### Expected Request Format
+- JSON payloads with camelCase fields
+- Include user authentication tokens
+- Support for multiple languages
+- Consistent error response structure
+
+### Response Format
+- Return analysis as plain text (not JSON objects)
+- Keep responses mobile-friendly (concise)
+- Support offline caching considerations
+- Maintain consistent response times
