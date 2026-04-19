@@ -9,6 +9,7 @@ import (
 func SetupRoutes(app *fiber.App) {
 	// Initialize OpenAI client first
 	InitOpenAI()
+	InitEncryption()
 	// Protected routes (require authentication)
 	api := app.Group("/api")
 	api.Use(middleware.SupabaseAuthMiddleware)
